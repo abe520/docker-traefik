@@ -214,6 +214,44 @@ services:
       #- "traefik.http.routers.ping.service=ping@internal"
       ## Middlewares
       - "traefik.http.routers.traefik-rtr.middlewares=chain-oauth@file"
+      
+#  the standard error pages of your HTTP server with something more original and pretty.
+  error-pages:
+    image: tarampampam/error-pages:latest # Using the latest tag is highly discouraged. Please, use tags in X.Y.Z format
+    container_name: error-pages
+    #network_mode: bridge
+    networks:
+      - t2_proxy   
+    restart: unless-stopped 
+    environment:
+      TEMPLATE_NAME: ghost
+      #l7-dark  set the error pages template
+      TZ: $TZ
+    labels:
+      traefik.enable: true
+      # use as "fallback" for any NON-registered services (with priority below normal)
+      traefik.http.routers.error-pages-router.rule: HostRegexp(`{host:.+}`)
+      traefik.http.routers.error-pages-router.priority: 1
+      # should say that all of your services work on https
+      traefik.http.routers.error-pages-router.entrypoints: https
+      traefik.http.routers.error-pages-router.middlewares: error-pages-middleware
+      # "errors" middleware settings
+      traefik.http.middlewares.error-pages-middleware.errors.status: 400-599
+      traefik.http.middlewares.error-pages-middleware.errors.service: error-pages-service
+      traefik.http.middlewares.error-pages-middleware.errors.query: /{status}.html
+      # define service properties
+      traefik.http.services.error-pages-service.loadbalancer.server.port: 8080
+  nginx-another:
+    image: nginx:1.21-alpine
+    container_name: nginx-another
+    networks:
+      - t2_proxy   
+    restart: unless-stopped
+    labels:
+      traefik.enable: true
+      traefik.http.routers.test-service.rule: Host(`nginx.$DOMAINNAME0`)
+      traefik.http.routers.test-service.entrypoints: https
+      traefik.http.routers.test-service.middlewares: error-pages-middleware
 
   # Docker Socket Proxy - Security Enchanced Proxy for Docker Socket
   socket-proxy:
